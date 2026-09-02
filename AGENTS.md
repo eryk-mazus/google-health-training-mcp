@@ -10,6 +10,7 @@ The project targets the current Google Health API at `health.googleapis.com/v4`.
 
 - `src/google_health_training_mcp/server.py`: MCP server and public tools
 - `src/google_health_training_mcp/google_health.py`: Google Health REST client, filters, and transformations
+- `src/google_health_training_mcp/normalization.py`: additive numeric workout, split, and event normalization
 - `src/google_health_training_mcp/auth.py`: OAuth flow, token refresh, and credential storage
 - `src/google_health_training_mcp/config.py`: platform-specific configuration, data paths, and legacy-name fallback
 - `src/google_health_training_mcp/cli.py`: authorization, diagnostics, logout, and STDIO entry points
