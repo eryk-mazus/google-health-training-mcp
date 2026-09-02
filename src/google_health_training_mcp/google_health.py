@@ -9,13 +9,25 @@ from google.auth.transport.requests import AuthorizedSession
 
 from google_health_training_mcp.auth import load_credentials
 from google_health_training_mcp.config import Settings
+from google_health_training_mcp.normalization import normalize_workout
 
 
 BASE_URL = "https://health.googleapis.com/v4"
 
 
 class GoogleHealthError(RuntimeError):
-    pass
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int,
+        provider_status: str | None = None,
+        reason: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.provider_status = provider_status
+        self.reason = reason
 
 
 def parse_date(value: str, *, name: str) -> date:
@@ -35,9 +47,9 @@ def date_range(start_date: str | None, end_date: str | None, *, default_days: in
     return start, end
 
 
-def _camel_data_type(data_type: str) -> str:
-    parts = data_type.split("-")
-    return parts[0] + "".join(part.title() for part in parts[1:])
+def _filter_data_type(data_type: str) -> str:
+    """Return the identifier used in Google Health filter expressions."""
+    return data_type.replace("-", "_")
 
 
 class GoogleHealthClient:
@@ -50,12 +62,28 @@ class GoogleHealthClient:
     def _request_json(self, method: str, path: str, *, params: dict[str, object] | None = None) -> dict[str, Any]:
         response = self._session().request(method, f"{BASE_URL}{path}", params=params, timeout=30)
         if not response.ok:
+            provider_status: str | None = None
+            reason: str | None = None
             try:
-                error = response.json().get("error", {})
+                payload = response.json()
+                error = payload.get("error", {}) if isinstance(payload, dict) else {}
+                if not isinstance(error, dict):
+                    error = {}
                 message = error.get("message") or response.reason
+                status = error.get("status")
+                provider_status = str(status) if status else None
+                for detail in error.get("details") or []:
+                    if isinstance(detail, dict) and detail.get("reason"):
+                        reason = str(detail["reason"])
+                        break
             except ValueError:
                 message = response.reason
-            raise GoogleHealthError(f"Google Health API returned HTTP {response.status_code}: {message}")
+            raise GoogleHealthError(
+                f"Google Health API returned HTTP {response.status_code}: {message}",
+                status_code=response.status_code,
+                provider_status=provider_status,
+                reason=reason,
+            )
         return response.json()
 
     def list_data_points(
@@ -95,13 +123,13 @@ class GoogleHealthClient:
 
 
 def civil_filter(data_type: str, start: date, end_inclusive: date) -> str:
-    field = f"{_camel_data_type(data_type)}.interval.civil_start_time"
+    field = f"{_filter_data_type(data_type)}.interval.civil_start_time"
     end_exclusive = end_inclusive + timedelta(days=1)
     return f'{field} >= "{start.isoformat()}" AND {field} < "{end_exclusive.isoformat()}"'
 
 
 def daily_filter(data_type: str, target: date) -> str:
-    field = f"{_camel_data_type(data_type)}.date"
+    field = f"{_filter_data_type(data_type)}.date"
     return f'{field} >= "{target.isoformat()}" AND {field} < "{(target + timedelta(days=1)).isoformat()}"'
 
 
@@ -111,7 +139,7 @@ def sleep_filter(target: date) -> str:
 
 
 def physical_sample_filter(data_type: str, start_time: str, end_time: str) -> str:
-    field = f"{_camel_data_type(data_type)}.sample_time.physical_time"
+    field = f"{_filter_data_type(data_type)}.sample_time.physical_time"
     return f'{field} >= "{start_time}" AND {field} < "{end_time}"'
 
 
@@ -120,8 +148,10 @@ def summarize_workout(point: dict[str, Any]) -> dict[str, Any]:
     interval = exercise.get("interval", {})
     metrics = exercise.get("metricsSummary", {})
     name = point.get("name", "")
+    normalized = normalize_workout(point)
     return {
-        "id": name.rsplit("/", 1)[-1] if name else None,
+        "id": normalized["workoutId"],
+        "workoutId": normalized["workoutId"],
         "name": name or None,
         "exerciseType": exercise.get("exerciseType"),
         "displayName": exercise.get("displayName"),
@@ -129,9 +159,12 @@ def summarize_workout(point: dict[str, Any]) -> dict[str, Any]:
         "endTime": interval.get("endTime"),
         "activeDuration": exercise.get("activeDuration"),
         "metrics": metrics,
-        "splitCount": len(exercise.get("splitSummaries", [])),
+        "splitCount": normalized["splitCount"],
+        "runningContinuityStatus": normalized["runningContinuity"]["status"],
         "hasGps": exercise.get("exerciseMetadata", {}).get("hasGps", False),
         "dataSource": point.get("dataSource"),
+        "duration": normalized["duration"],
+        **normalized["metrics"],
     }
 
 

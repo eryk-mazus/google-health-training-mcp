@@ -6,10 +6,13 @@ from typing import Any
 from mcp.server import MCPServer
 from mcp.types import ToolAnnotations
 
-from google_health_training_mcp.auth import authentication_status
+from google.auth.exceptions import RefreshError, TransportError
+
+from google_health_training_mcp.auth import CredentialStoreError, authentication_status
 from google_health_training_mcp.config import Settings
 from google_health_training_mcp.google_health import (
     GoogleHealthClient,
+    GoogleHealthError,
     civil_filter,
     daily_filter,
     date_range,
@@ -20,6 +23,7 @@ from google_health_training_mcp.google_health import (
     sleep_filter,
     summarize_workout,
 )
+from google_health_training_mcp.normalization import normalize_workout
 
 
 mcp = MCPServer(
@@ -87,8 +91,17 @@ def list_workouts(
 
 @mcp.tool(annotations=READ_ONLY_TOOL)
 def get_workout(workout_id: str) -> dict[str, Any]:
-    """Get one complete workout session, including summary metrics, events, laps, and splits."""
-    return _client().get_data_point("exercise", workout_id)
+    """Get one complete workout with normalized fields and its source Google record.
+
+    The additive normalized field supplies numeric SI values, direct identity, splits,
+    and exactly deduplicated events. Existing top-level Google fields remain unchanged.
+    """
+    workout = _client().get_data_point("exercise", workout_id)
+    return {
+        **workout,
+        "workoutId": workout_id.rsplit("/", 1)[-1],
+        "normalized": normalize_workout(workout),
+    }
 
 
 @mcp.tool(annotations=READ_ONLY_TOOL)
@@ -131,6 +144,7 @@ def get_recovery_snapshot(target_date: str | None = None) -> dict[str, Any]:
     target = parse_date(target_date, name="target_date") if target_date else date.today()
     client = _client()
     data: dict[str, object] = {}
+    metrics: dict[str, object] = {}
     errors: dict[str, str] = {}
     data_types = (
         "daily-heart-rate-variability",
@@ -141,20 +155,88 @@ def get_recovery_snapshot(target_date: str | None = None) -> dict[str, Any]:
     )
     for data_type in data_types:
         try:
-            data[data_type] = client.list_data_points(
+            records = client.list_data_points(
                 data_type,
                 filter_expression=daily_filter(data_type, target),
                 max_results=25,
             )
+            data[data_type] = records
+            metrics[data_type] = {
+                "status": "available" if records else "no_data",
+                "records": records,
+            }
         except Exception as exc:
-            errors[data_type] = str(exc)
+            error_code = _safe_recovery_error_code(exc)
+            errors[data_type] = error_code
+            metrics[data_type] = {
+                "status": _recovery_error_status(error_code),
+                "records": [],
+                "errorCode": error_code,
+            }
     try:
-        data["sleep"] = client.list_data_points(
+        records = client.list_data_points(
             "sleep", filter_expression=sleep_filter(target), max_results=25
         )
+        data["sleep"] = records
+        metrics["sleep"] = {
+            "status": "available" if records else "no_data",
+            "records": records,
+        }
     except Exception as exc:
-        errors["sleep"] = str(exc)
-    return {"date": target.isoformat(), "data": data, "unavailable": errors}
+        error_code = _safe_recovery_error_code(exc)
+        errors["sleep"] = error_code
+        metrics["sleep"] = {
+            "status": _recovery_error_status(error_code),
+            "records": [],
+            "errorCode": error_code,
+        }
+    if not errors:
+        status = "ok"
+    elif len(errors) == len(metrics):
+        status = "error"
+    else:
+        status = "partial"
+    return {
+        "status": status,
+        "date": target.isoformat(),
+        "metrics": metrics,
+        "data": data,
+        "unavailable": errors,
+    }
+
+
+def _safe_recovery_error_code(exc: Exception) -> str:
+    if isinstance(exc, (CredentialStoreError, RefreshError)):
+        return "AUTHENTICATION_FAILED"
+    if isinstance(exc, TransportError):
+        return "NETWORK_ERROR"
+    if not isinstance(exc, GoogleHealthError):
+        return "RUNTIME_ERROR"
+    if exc.status_code == 400 and exc.reason == "INVALID_DATA_POINT_FILTER":
+        return "UNSUPPORTED_FILTER"
+    if exc.status_code == 400:
+        return "INVALID_REQUEST"
+    if exc.status_code == 401:
+        return "AUTHENTICATION_FAILED"
+    if exc.status_code == 403:
+        return "PERMISSION_DENIED"
+    if exc.status_code == 404:
+        return "UNSUPPORTED_DATA_TYPE"
+    if exc.status_code == 429:
+        return "RATE_LIMITED"
+    if exc.status_code >= 500:
+        return "PROVIDER_UNAVAILABLE"
+    return "PROVIDER_ERROR"
+
+
+def _recovery_error_status(error_code: str) -> str:
+    if error_code == "AUTHENTICATION_FAILED":
+        return "authentication_error"
+    if error_code == "PERMISSION_DENIED":
+        return "permission_denied"
+    if error_code in {"NETWORK_ERROR", "RUNTIME_ERROR"}:
+        return "runtime_error"
+    return "provider_error"
 
 
 def run() -> None:

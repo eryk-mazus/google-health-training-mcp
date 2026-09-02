@@ -1,5 +1,7 @@
 # Google Health MCP for Training (Unofficial)
 
+[![CI](https://github.com/eryk-mazus/google-health-training-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/eryk-mazus/google-health-training-mcp/actions/workflows/ci.yml)
+
 An unofficial, local-first **Google Health MCP server** for training and recovery analysis with AI agents. It gives Codex and other Model Context Protocol clients read-only access to workouts, running sessions, heart rate, sleep, HRV, resting heart rate, respiratory rate, oxygen saturation, and VO2 max from the Google Health API v4.
 
 Use it with health data recorded by Pixel Watch, Fitbit, and other sources synchronized to your Google Health account.
@@ -32,6 +34,15 @@ The MCP client launches the server over STDIO when needed and stops it with the 
 | `get_recovery_snapshot` | Retrieve sleep and daily recovery-related source measurements |
 
 The server returns recorded source measurements, not a proprietary readiness score or medical diagnosis.
+
+### Response conventions
+
+- Workout summaries retain Google's original `metrics` object and also expose normalized numeric fields such as `workoutId`, `duration.activeSeconds`, `distanceMeters`, `averagePaceSecondsPerKm`, and `steps`.
+- `get_workout` retains the original Google fields at the top level and adds a `normalized` view with numeric SI values, compatible splits, and exactly deduplicated events.
+- Both the documented `splitSummaries` field and the `splits` field observed in Fitbit-backed responses are supported.
+- Running-labelled workouts explicitly report continuity as `unknown`; distance splits alone cannot prove that the user ran continuously.
+- Active Zone Minutes are intensity-weighted: vigorous and peak-zone minutes can count twice, so the value may exceed workout duration.
+- Recovery metrics report `available`, `no_data`, or a categorized error status. `no_data` means the API returned no record; it cannot distinguish “not measured” from “not synchronized yet.” Raw provider exceptions and local paths are not returned.
 
 ## Compatibility
 
