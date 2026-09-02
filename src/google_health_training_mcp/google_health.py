@@ -7,8 +7,8 @@ from urllib.parse import quote
 
 from google.auth.transport.requests import AuthorizedSession
 
-from pixel_health_mcp.auth import load_credentials
-from pixel_health_mcp.config import Settings
+from google_health_training_mcp.auth import load_credentials
+from google_health_training_mcp.config import Settings
 
 
 BASE_URL = "https://health.googleapis.com/v4"

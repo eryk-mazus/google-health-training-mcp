@@ -4,13 +4,13 @@ import argparse
 import json
 from pathlib import Path
 
-from pixel_health_mcp.auth import TokenStore, authenticate, authentication_status
-from pixel_health_mcp.config import Settings
+from google_health_training_mcp.auth import TokenStore, authenticate, authentication_status
+from google_health_training_mcp.config import Settings
 
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="pixel-health-mcp",
+        prog="google-health-training-mcp",
         description="Local, read-only MCP access to personal Google Health data.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -39,7 +39,7 @@ def main() -> None:
     settings = Settings.load()
 
     if args.command == "serve":
-        from pixel_health_mcp.server import run
+        from google_health_training_mcp.server import run
 
         run()
         return

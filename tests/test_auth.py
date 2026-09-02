@@ -2,7 +2,8 @@ import os
 
 import pytest
 
-from pixel_health_mcp.auth import _fetch_token_from_loopback
+import google_health_training_mcp.auth as auth_module
+from google_health_training_mcp.auth import TokenStore, _fetch_token_from_loopback
 
 
 class FakeFlow:
@@ -47,3 +48,23 @@ def test_loopback_exchange_rejects_non_google_token_endpoint() -> None:
             authorization_response="http://127.0.0.1:8765/oauth/callback?code=example",
             callback_uri="http://127.0.0.1:8765/oauth/callback",
         )
+
+
+def test_file_store_reads_legacy_path_and_writes_new_path(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    current = tmp_path / "current" / "google-oauth.json"
+    legacy = tmp_path / "legacy" / "google-oauth.json"
+    legacy.parent.mkdir()
+    legacy.write_text('{"marker": "legacy"}\n', encoding="utf-8")
+    legacy.chmod(0o600)
+    monkeypatch.setattr(auth_module, "TOKEN_FILE", current)
+    monkeypatch.setattr(auth_module, "LEGACY_TOKEN_FILE", legacy)
+
+    store = TokenStore("file")
+    assert store.load() == {"marker": "legacy"}
+
+    store.save({"marker": "current"})
+    assert current.exists()
+    assert current.stat().st_mode & 0o777 == 0o600
+    assert store.load() == {"marker": "current"}

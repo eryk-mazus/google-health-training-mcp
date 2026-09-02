@@ -1,8 +1,12 @@
 .venv/
 .tools/
 .uv-cache/
+build/
+dist/
 __pycache__/
 .pytest_cache/
+.coverage
+htmlcov/
 *.py[cod]
 *.egg-info/
 client_secret*.json

@@ -2,17 +2,17 @@
 
 ## Project purpose
 
-This repository implements a local, read-only MCP server for a user's Google Health training and recovery data. The primary clients are coding or personal-assistant agents such as Codex. Preserve user privacy, predictable tool schemas, and bounded responses over feature breadth.
+This repository implements **Google Health MCP for Training (Unofficial)**, a local, read-only MCP server for a user's Google Health training and recovery data. The primary clients are coding or personal-assistant agents such as Codex. Preserve user privacy, predictable tool schemas, and bounded responses over feature breadth.
 
-The project targets the current Google Health API at `health.googleapis.com/v4`. Do not add new integrations against the legacy Fitbit Web API.
+The project targets the current Google Health API at `health.googleapis.com/v4`. Do not add integrations against the legacy Fitbit Web API.
 
 ## Repository map
 
-- `src/pixel_health_mcp/server.py`: MCP server and public tools
-- `src/pixel_health_mcp/google_health.py`: Google Health REST client, filters, and transformations
-- `src/pixel_health_mcp/auth.py`: OAuth flow, token refresh, and credential storage
-- `src/pixel_health_mcp/config.py`: platform-specific configuration and data paths
-- `src/pixel_health_mcp/cli.py`: `auth`, diagnostics, logout, and STDIO server entry points
+- `src/google_health_training_mcp/server.py`: MCP server and public tools
+- `src/google_health_training_mcp/google_health.py`: Google Health REST client, filters, and transformations
+- `src/google_health_training_mcp/auth.py`: OAuth flow, token refresh, and credential storage
+- `src/google_health_training_mcp/config.py`: platform-specific configuration, data paths, and legacy-name fallback
+- `src/google_health_training_mcp/cli.py`: authorization, diagnostics, logout, and STDIO entry points
 - `tests/`: offline unit and MCP discovery tests
 
 ## Setup and verification
@@ -22,11 +22,19 @@ Use `uv`; do not document environment-specific virtual-environment paths.
 ```bash
 uv sync --extra dev
 uv run pytest
-uv run pixel-health-mcp --help
-uv run pixel-health-mcp doctor
+uv run google-health-training-mcp --help
+uv run google-health-training-mcp doctor
 ```
 
-Tests must be offline, must not open a browser, and must not load, overwrite, or delete real user credentials. Mock HTTP and credential boundaries for integration tests.
+Tests must be offline, must not open a browser, and must not load, overwrite, or delete real user credentials. Mock HTTP, filesystem, keyring, and credential boundaries for integration tests.
+
+## Naming and compatibility
+
+- The public project, package, and primary CLI name is `google-health-training-mcp`.
+- The display name is `Google Health MCP for Training (Unofficial)`.
+- Keep `pixel-health-mcp` only as a transitional CLI/config compatibility alias until a documented breaking release removes it.
+- New configuration and tokens use `google-health-training-mcp`; reads may fall back to legacy Pixel-named locations.
+- Always retain the unofficial/non-affiliation disclaimer. Do not use Google or Fitbit logos or imply endorsement.
 
 ## Security and privacy invariants
 
@@ -63,7 +71,7 @@ This server does not currently persist a training plan, goals, or agent memory. 
 
 ## Change discipline
 
-- Keep the README directory-agnostic and suitable for a public repository.
+- Keep the README directory-agnostic, search-friendly, and suitable for a public repository.
 - Update README tool documentation and discovery tests whenever the public MCP surface changes.
-- Add focused tests for parsing, filters, pagination, response bounding, and error redaction.
+- Add focused tests for parsing, filters, pagination, response bounding, credential migration, and error redaction.
 - Run the full offline test suite before handing off a change.

@@ -9,34 +9,38 @@ from typing import Literal
 
 
 CredentialStoreName = Literal["keyring", "file"]
+APP_NAME = "google-health-training-mcp"
+LEGACY_APP_NAME = "pixel-health-mcp"
 
 
-def _config_root() -> Path:
-    override = os.environ.get("PIXEL_HEALTH_CONFIG_DIR")
+def _config_root(app_name: str, override_name: str) -> Path:
+    override = os.environ.get(override_name)
     if override:
         return Path(override).expanduser()
     if sys.platform == "win32":
         base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
-        return base / "pixel-health-mcp"
+        return base / app_name
     if sys.platform == "darwin":
-        return Path.home() / "Library" / "Application Support" / "pixel-health-mcp"
-    return Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "pixel-health-mcp"
+        return Path.home() / "Library" / "Application Support" / app_name
+    return Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / app_name
 
 
-def _data_root() -> Path:
-    override = os.environ.get("PIXEL_HEALTH_DATA_DIR")
+def _data_root(app_name: str, override_name: str) -> Path:
+    override = os.environ.get(override_name)
     if override:
         return Path(override).expanduser()
     if sys.platform == "win32":
         base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
-        return base / "pixel-health-mcp"
+        return base / app_name
     if sys.platform == "darwin":
-        return Path.home() / "Library" / "Application Support" / "pixel-health-mcp"
-    return Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share")) / "pixel-health-mcp"
+        return Path.home() / "Library" / "Application Support" / app_name
+    return Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share")) / app_name
 
 
-CONFIG_PATH = _config_root() / "config.json"
-TOKEN_FILE = _data_root() / "google-oauth.json"
+CONFIG_PATH = _config_root(APP_NAME, "GOOGLE_HEALTH_TRAINING_CONFIG_DIR") / "config.json"
+TOKEN_FILE = _data_root(APP_NAME, "GOOGLE_HEALTH_TRAINING_DATA_DIR") / "google-oauth.json"
+LEGACY_CONFIG_PATH = _config_root(LEGACY_APP_NAME, "PIXEL_HEALTH_CONFIG_DIR") / "config.json"
+LEGACY_TOKEN_FILE = _data_root(LEGACY_APP_NAME, "PIXEL_HEALTH_DATA_DIR") / "google-oauth.json"
 
 
 @dataclass(slots=True)
@@ -52,13 +56,18 @@ class Settings:
     @classmethod
     def load(cls) -> "Settings":
         values: dict[str, object] = {}
-        if CONFIG_PATH.exists():
-            values = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+        config_path = CONFIG_PATH if CONFIG_PATH.exists() else LEGACY_CONFIG_PATH
+        if config_path.exists():
+            values = json.loads(config_path.read_text(encoding="utf-8"))
 
-        env_secret = os.environ.get("PIXEL_HEALTH_CLIENT_SECRETS")
+        env_secret = os.environ.get("GOOGLE_HEALTH_TRAINING_CLIENT_SECRETS") or os.environ.get(
+            "PIXEL_HEALTH_CLIENT_SECRETS"
+        )
         if env_secret:
             values["client_secrets_file"] = env_secret
-        env_port = os.environ.get("PIXEL_HEALTH_OAUTH_CALLBACK_PORT")
+        env_port = os.environ.get("GOOGLE_HEALTH_TRAINING_OAUTH_CALLBACK_PORT") or os.environ.get(
+            "PIXEL_HEALTH_OAUTH_CALLBACK_PORT"
+        )
         if env_port:
             values["oauth_callback_port"] = int(env_port)
 
@@ -79,7 +88,7 @@ class Settings:
         if not self.client_secrets_file:
             raise RuntimeError(
                 "Google OAuth client JSON is not configured. Run "
-                "`pixel-health-mcp auth --client-secrets /path/to/client_secret.json`."
+                "`google-health-training-mcp auth --client-secrets /path/to/client_secret.json`."
             )
         path = Path(self.client_secrets_file).expanduser().resolve()
         if not path.is_file():

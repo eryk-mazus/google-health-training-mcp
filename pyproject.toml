@@ -3,12 +3,32 @@ requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [project]
-name = "pixel-health-mcp"
+name = "google-health-training-mcp"
 version = "0.1.0"
-description = "A local, read-only MCP server for personal Google Health training data."
+description = "Unofficial, local-first Google Health API v4 MCP server for training and recovery data."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
+keywords = [
+  "codex",
+  "fitbit",
+  "google-health",
+  "health-data",
+  "mcp",
+  "model-context-protocol",
+  "pixel-watch",
+  "running",
+  "training",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Information Analysis",
+]
 dependencies = [
   "google-auth>=2.35,<3",
   "google-auth-oauthlib>=1.2,<2",
@@ -23,10 +43,17 @@ dev = [
 ]
 
 [project.scripts]
-pixel-health-mcp = "pixel_health_mcp.cli:main"
+google-health-training-mcp = "google_health_training_mcp.cli:main"
+pixel-health-mcp = "google_health_training_mcp.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/eryk-mazus/google-health-training-mcp"
+Documentation = "https://github.com/eryk-mazus/google-health-training-mcp#readme"
+Issues = "https://github.com/eryk-mazus/google-health-training-mcp/issues"
+Repository = "https://github.com/eryk-mazus/google-health-training-mcp"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/pixel_health_mcp"]
+packages = ["src/google_health_training_mcp"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

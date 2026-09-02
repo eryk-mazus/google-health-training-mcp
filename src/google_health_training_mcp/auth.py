@@ -16,7 +16,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from keyring.errors import KeyringError
 
-from pixel_health_mcp.config import TOKEN_FILE, Settings
+from google_health_training_mcp.config import LEGACY_TOKEN_FILE, TOKEN_FILE, Settings
 
 
 SCOPES = [
@@ -25,7 +25,8 @@ SCOPES = [
     "https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly",
 ]
 
-KEYRING_SERVICE = "pixel-health-mcp"
+KEYRING_SERVICE = "google-health-training-mcp"
+LEGACY_KEYRING_SERVICE = "pixel-health-mcp"
 KEYRING_ACCOUNT = "google-oauth-default"
 
 
@@ -41,14 +42,17 @@ class TokenStore:
         if self.mode == "keyring":
             try:
                 value = keyring.get_password(KEYRING_SERVICE, KEYRING_ACCOUNT)
+                if not value:
+                    value = keyring.get_password(LEGACY_KEYRING_SERVICE, KEYRING_ACCOUNT)
             except KeyringError as exc:
                 raise CredentialStoreError(_keyring_help(exc)) from exc
             return json.loads(value) if value else None
 
-        if not TOKEN_FILE.exists():
+        token_file = TOKEN_FILE if TOKEN_FILE.exists() else LEGACY_TOKEN_FILE
+        if not token_file.exists():
             return None
-        _check_private_file(TOKEN_FILE)
-        return json.loads(TOKEN_FILE.read_text(encoding="utf-8"))
+        _check_private_file(token_file)
+        return json.loads(token_file.read_text(encoding="utf-8"))
 
     def save(self, value: dict[str, object]) -> None:
         payload = json.dumps(value)
@@ -70,23 +74,26 @@ class TokenStore:
     def delete(self) -> bool:
         if self.mode == "keyring":
             try:
-                existing = keyring.get_password(KEYRING_SERVICE, KEYRING_ACCOUNT)
-                if not existing:
-                    return False
-                keyring.delete_password(KEYRING_SERVICE, KEYRING_ACCOUNT)
-                return True
+                deleted = False
+                for service in (KEYRING_SERVICE, LEGACY_KEYRING_SERVICE):
+                    if keyring.get_password(service, KEYRING_ACCOUNT):
+                        keyring.delete_password(service, KEYRING_ACCOUNT)
+                        deleted = True
+                return deleted
             except KeyringError as exc:
                 raise CredentialStoreError(_keyring_help(exc)) from exc
-        if TOKEN_FILE.exists():
-            TOKEN_FILE.unlink()
-            return True
-        return False
+        deleted = False
+        for token_file in (TOKEN_FILE, LEGACY_TOKEN_FILE):
+            if token_file.exists():
+                token_file.unlink()
+                deleted = True
+        return deleted
 
 
 def _keyring_help(exc: Exception) -> str:
     return (
         "No usable OS keyring is available. Install/configure a keyring backend, or explicitly "
-        "use `pixel-health-mcp auth --credential-store file ...` to store the refresh token "
+        "use `google-health-training-mcp auth --credential-store file ...` to store the refresh token "
         f"in a permission-restricted local file. Original error: {exc}"
     )
 
@@ -139,7 +146,9 @@ def _fetch_token_from_loopback(
 def load_credentials(settings: Settings, *, refresh: bool = True) -> Credentials:
     info = TokenStore(settings.credential_store).load()
     if not info:
-        raise RuntimeError("Google Health is not authenticated. Run `pixel-health-mcp auth` first.")
+        raise RuntimeError(
+            "Google Health is not authenticated. Run `google-health-training-mcp auth` first."
+        )
     credentials = Credentials.from_authorized_user_info(info, scopes=SCOPES)
     if refresh and (not credentials.valid or credentials.expired):
         if not credentials.refresh_token:

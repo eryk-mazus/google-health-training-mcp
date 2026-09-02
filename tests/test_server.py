@@ -1,7 +1,7 @@
 import anyio
 from mcp import Client
 
-from pixel_health_mcp.server import mcp
+from google_health_training_mcp.server import mcp
 
 
 EXPECTED_TOOLS = {

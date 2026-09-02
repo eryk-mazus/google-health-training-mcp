@@ -6,9 +6,9 @@ from typing import Any
 from mcp.server import MCPServer
 from mcp.types import ToolAnnotations
 
-from pixel_health_mcp.auth import authentication_status
-from pixel_health_mcp.config import Settings
-from pixel_health_mcp.google_health import (
+from google_health_training_mcp.auth import authentication_status
+from google_health_training_mcp.config import Settings
+from google_health_training_mcp.google_health import (
     GoogleHealthClient,
     civil_filter,
     daily_filter,
@@ -23,7 +23,7 @@ from pixel_health_mcp.google_health import (
 
 
 mcp = MCPServer(
-    "Pixel Health",
+    "Google Health MCP for Training",
     instructions=(
         "Read-only access to the user's personal Google Health training and recovery data. "
         "Never interpret these measurements as a medical diagnosis. Prefer summaries before "

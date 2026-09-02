@@ -2,7 +2,7 @@ from datetime import date
 
 import pytest
 
-from pixel_health_mcp.google_health import (
+from google_health_training_mcp.google_health import (
     civil_filter,
     daily_filter,
     date_range,
