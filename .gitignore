@@ -1,0 +1,13 @@
+.venv/
+.tools/
+.uv-cache/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+*.egg-info/
+client_secret*.json
+credentials*.json
+*.apps.googleusercontent.com.json
+google-oauth.json
+.env
+.env.*

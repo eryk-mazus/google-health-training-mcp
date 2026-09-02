@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pixel-health-mcp"
+version = "0.1.0"
+description = "A local, read-only MCP server for personal Google Health training data."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+  "google-auth>=2.35,<3",
+  "google-auth-oauthlib>=1.2,<2",
+  "keyring>=25,<26",
+  "mcp>=2,<3",
+  "requests>=2.32,<3",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8,<9",
+]
+
+[project.scripts]
+pixel-health-mcp = "pixel_health_mcp.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pixel_health_mcp"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
